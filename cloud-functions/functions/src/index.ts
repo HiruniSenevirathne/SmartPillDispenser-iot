@@ -44,6 +44,59 @@ export const updateScheduleQueue = functions.database
       const dbRef = admin.database().ref(newRef);
       await dbRef.set(item);
     }
+
+    const patientDaySchedules = `schedules/${item.date}/${patientUID}`;
+    const mapOfDaySchedulesRes = await admin
+      .database()
+      .ref(patientDaySchedules)
+      .get();
+
+    let devSchedulestr = "";
+    if (mapOfDaySchedulesRes.exists()) {
+      const scheduleMapData = mapOfDaySchedulesRes.val();
+      Object.keys(scheduleMapData).forEach((scheduleId) => {
+        const schedule = scheduleMapData[scheduleId];
+        if (
+          schedule &&
+          schedule.medication_type === "Pills" &&
+          schedule.status == "0"
+        ) {
+          const timeData = schedule.time.split(":");
+          devSchedulestr += `${scheduleId}-${timeData[0]}-${timeData[1]},`;
+        }
+      });
+    }
+    const deviceScheduleRef = `devices/${item.date}/${patientUID}/`;
+    admin.database().ref(deviceScheduleRef).set(devSchedulestr);
+  });
+
+/**
+ * when device update schedule item status this function adds timestamp to dispensed_time field
+ */
+export const updateScheduleTakenTime = functions.database
+  .ref("/patients/{patientUID}/schedule/{scheduleId}/status")
+  .onWrite(async (snapshot, context) => {
+    // Grab the current value of what was written to the Realtime Database.
+
+    let isDelete = false;
+
+    const patientUID: string = context.params.patientUID;
+    const scheduleId: string = context.params.scheduleId;
+
+    let item: string;
+
+    if (!snapshot.after.exists()) {
+      isDelete = true;
+      item = snapshot.before.val();
+    } else {
+      item = snapshot.after.val();
+    }
+    if (item == "1" && !isDelete) {
+      const newRef = `/patients/${patientUID}/schedule/${scheduleId}/dispensed_time`;
+      const dbRef = admin.database().ref(newRef);
+      // await dbRef.set(moment().utc().add(330, "m").unix());
+      await dbRef.set(moment().unix());
+    }
   });
 
 export const scheduledFunctionCrontab = functions.pubsub
@@ -51,10 +104,10 @@ export const scheduledFunctionCrontab = functions.pubsub
   //  export const scheduledFunctionCrontab = functions.pubsub.schedule('*/5 * * * *')
   .timeZone("America/New_York") // Users can choose timezone - default is America/Los_Angeles
   .onRun(async (context) => {
-    const dbRef = admin.database().ref("testcron");
+    // const dbRef = admin.database().ref("testcron");
 
     const dateStamp = moment().utc().add(330, "m").format("YYYY-MM-DD-HH-mm");
-    await dbRef.set(dateStamp);
+    // await dbRef.set(dateStamp);
 
     let dtStrList = dateStamp.split("-");
     const dtStr = `${dtStrList[0]}-${dtStrList[1]}-${dtStrList[2]}`;
