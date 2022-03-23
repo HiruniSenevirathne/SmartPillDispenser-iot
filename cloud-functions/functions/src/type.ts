@@ -2,6 +2,7 @@ export interface IScheduleItem {
   comment: string;
   date: string;
   medication_type: string;
+  status: String;
   time: string;
 }
 export interface IDBSchedulesMap {
